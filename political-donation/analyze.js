@@ -140,13 +140,18 @@ function getParty(tag) {
 }
 
 const multiCandidateDonors = new Map();
+let triCandidateDonorCount = 0;
 for (const [donorKey, tags] of donorMap) {
   const candidates = new Set([...tags].map(getCandidate));
   if (candidates.size >= 2) {
     multiCandidateDonors.set(donorKey, tags);
   }
+  if (candidates.size >= 3) {
+    triCandidateDonorCount++;
+  }
 }
 console.log(`Donors who donated to ≥2 different candidates: ${multiCandidateDonors.size}`);
+console.log(`Donors who donated to ≥3 different candidates: ${triCandidateDonorCount}`);
 
 // ── 4. Build cross-candidate pair counts ──────────────────────────────────────
 console.log('Computing cross-candidate pairs...');
@@ -342,7 +347,7 @@ const html = `<!DOCTYPE html>
 
 <h2>統計摘要</h2>
 <div class="summary-grid">
-  <div class="summary-item"><div class="num">${multiCandidateDonors.size.toLocaleString()}</div><div class="label">捐給 ≥2 位不同立委的捐款人</div></div>
+  <div class="summary-item"><div class="num">${triCandidateDonorCount.toLocaleString()}</div><div class="label">捐給 ≥3 位不同立委的捐款人</div></div>
   <div class="summary-item"><div class="num">${significantPairs.length.toLocaleString()}</div><div class="label">符合門檻的候選人配對組數</div></div>
   <div class="summary-item"><div class="num">${sameElecPairs.length.toLocaleString()}</div><div class="label">同屆選舉配對</div></div>
   <div class="summary-item"><div class="num">${crossElecPairs.length.toLocaleString()}</div><div class="label">跨屆選舉配對</div></div>
