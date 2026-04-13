@@ -1,0 +1,27 @@
+# 資料庫（含個資，不推上去）
+*.sqlite
+*.db
+
+# 除錯紀錄
+*_debug*.txt
+*_check*.txt
+*_network*.txt
+*_money*.txt
+
+# 原始資料 CSV（體積大）
+incomes.csv
+parties.csv
+list.csv
+spouse.csv
+supplement.csv
+
+# 分析中間產物
+*.json
+tbl*.txt
+ziplist*.txt
+table_list.txt
+structure_debug*.txt
+schema_check.txt
+
+# 其他
+.claude/
