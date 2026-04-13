@@ -71,7 +71,8 @@ const allSupplement = parseCSV(path.join(__dirname, 'supplement.csv'));
 const allList       = parseCSV(path.join(__dirname, 'list.csv'));
 const allSpouse     = parseCSV(path.join(__dirname, 'spouse.csv'));
 const allIncomes    = parseCSV(path.join(__dirname, 'incomes.csv'));
-console.log(`  parties=${allParties.length}, list=${allList.length}, incomes=${allIncomes.length}`);
+const allCCM        = parseCSV(path.join(__dirname, 'ccm_search.csv'));
+console.log(`  parties=${allParties.length}, list=${allList.length}, incomes=${allIncomes.length}, ccm=${allCCM.length}`);
 
 // ── Build profile for one person ──────────────────────────────────
 function buildProfile(name) {
@@ -149,13 +150,18 @@ function buildProfile(name) {
   const birthFmt = formatBirth(ref.birth || '');
   const wonCount = elections.filter(e => e.won).length;
 
+  // Relatives from ccm_search.csv (readr-media curated)
+  const relatives = allCCM
+    .filter(r => r['議員'] === name && r['親屬姓名'])
+    .map(r => ({ relation: r['關係'], relName: r['親屬姓名'], region: r['區域'] }));
+
   return {
     name, elections, positions, spouseName, partyHistory, currentParty,
     gender: ref.gender || '', birth: birthFmt,
     edu: elections.find(e => e.edu)?.edu || '',
     wonCount, lostCount: elections.length - wonCount,
     totalElections: elections.length,
-    totalIncome, donationTypes,
+    totalIncome, donationTypes, relatives,
   };
 }
 
@@ -254,6 +260,19 @@ function buildPositionList(p) {
   return html;
 }
 
+function buildRelativesSection(p) {
+  if (!p.relatives || p.relatives.length === 0)
+    return `<p class="no-data">ccm_search.csv 中無此人親屬記錄（資料以縣市議員為主）</p>`;
+  const rows = p.relatives.map(r =>
+    `<tr><td>${esc(r.relation)}</td><td><strong>${esc(r.relName)}</strong></td><td style="color:#888;font-size:0.85rem;">${esc(r.region)}</td></tr>`
+  ).join('');
+  return `<table class="el-table">
+  <thead><tr><th>關係</th><th>姓名</th><th>區域</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<p style="font-size:0.78rem;color:#aaa;margin-top:0.6rem;">資料來源：readr-media ccm_search.csv</p>`;
+}
+
 function buildPartyHistory(p) {
   if (p.partyHistory.length <= 1) {
     return `<p>自紀錄以來始終為 <span class="party-badge" style="background:${partyColor(p.currentParty)}">${esc(p.currentParty)}</span></p>`;
@@ -324,6 +343,11 @@ const panelsHTML = profiles.map((p, i) => {
   <section>
     <h2>政治獻金收入</h2>
     ${buildDonationBar(p)}
+  </section>
+
+  <section>
+    <h2>親屬關係（${p.relatives.length} 筆）</h2>
+    ${buildRelativesSection(p)}
   </section>
 
 </div>`;
