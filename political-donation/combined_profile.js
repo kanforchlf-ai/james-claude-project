@@ -5,7 +5,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const TARGETS = ['蔡英文', '韓國瑜', '柯文哲', '柯建銘', '苗博雅'];
+const TARGETS = ['蔡英文', '韓國瑜', '柯文哲', '柯建銘', '苗博雅', '蕭景田'];
 const OUTPUT  = path.join(__dirname, '政治人物選舉紀錄.html');
 
 // ── CSV helpers ───────────────────────────────────────────────────
