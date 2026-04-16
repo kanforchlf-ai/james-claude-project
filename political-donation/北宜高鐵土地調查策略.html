@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>北宜高鐵土地調查策略分析</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #222;
+      line-height: 1.75;
+      font-size: 16px;
+      padding: 48px 24px 80px;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 1.25rem; font-weight: 700; margin: 40px 0 12px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+    h3 { font-size: 1.05rem; font-weight: 700; margin: 28px 0 8px; }
+    p  { margin-bottom: 12px; }
+
+    .subtitle {
+      color: #555;
+      font-size: 0.9rem;
+      margin-bottom: 40px;
+      border-left: 3px solid #ccc;
+      padding-left: 12px;
+      background: #f8f8f8;
+      padding: 8px 12px;
+    }
+
+    /* 問題卡片 */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0 28px;
+    }
+    .problem-item {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 16px;
+    }
+    .problem-item .label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .problem-item .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .problem-item .desc { font-size: 0.85rem; color: #555; margin-top: 4px; }
+
+    /* 策略對比表格 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 28px;
+      font-size: 0.9rem;
+    }
+    th {
+      background: #f3f3f3;
+      font-weight: 700;
+      text-align: left;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+    }
+    td {
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #fafafa; }
+
+    /* 優化流程 */
+    .steps { margin: 16px 0 28px; }
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border: 2px solid #222;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-body .step-title { font-weight: 700; margin-bottom: 4px; }
+    .step-body .step-effect {
+      display: inline-block;
+      font-size: 0.8rem;
+      border: 1px solid #ccc;
+      padding: 2px 8px;
+      border-radius: 2px;
+      margin-top: 4px;
+      color: #555;
+    }
+
+    /* 費用比較 */
+    .cost-table-wrap { overflow-x: auto; }
+
+    /* 決策問題 */
+    .decisions { margin: 16px 0 28px; }
+    .decision {
+      border-left: 3px solid #999;
+      background: #f8f8f8;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    .decision .q { font-weight: 700; margin-bottom: 4px; }
+    .decision .hint { font-size: 0.85rem; color: #555; }
+
+    /* 底部備註 */
+    .footer-note {
+      margin-top: 48px;
+      font-size: 0.8rem;
+      color: #999;
+      border-top: 1px solid #eee;
+      padding-top: 16px;
+    }
+
+    @media (max-width: 480px) {
+      .problem-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>北宜高鐵土地調查策略分析</h1>
+  <div class="subtitle">整理自 2026.04.14–16 團隊討論 ／ 供會議報告使用</div>
+
+  <!-- ── 一、核心難題 ── -->
+  <h2>一、核心難題</h2>
+  <div class="problem-grid">
+    <div class="problem-item">
+      <div class="label">調查標的</div>
+      <div class="value">4,639</div>
+      <div class="desc">北宜高鐵特定區內土地筆數</div>
+    </div>
+    <div class="problem-item">
+      <div class="label">原估規費</div>
+      <div class="value">~ 9 萬</div>
+      <div class="desc">每份 10 元，謄本 + 異動索引</div>
+    </div>
+    <div class="problem-item">
+      <div class="label">實際規費</div>
+      <div class="value">20＋ 萬</div>
+      <div class="desc">調漲為每「張」20 元，地主多則翻倍</div>
+    </div>
+    <div class="problem-item">
+      <div class="label">數位斷層</div>
+      <div class="value">部分紙本</div>
+      <div class="desc">部分區段無電子檔，OCR 轉錄成本高</div>
+    </div>
+  </div>
+
+  <!-- ── 二、資料類型與費用說明 ── -->
+  <h2>二、資料類型與費用說明</h2>
+
+  <h3>謄本分級（誰能看、能看什麼）</h3>
+  <div class="cost-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>類別</th>
+          <th>誰能申請</th>
+          <th>姓名</th>
+          <th>身分證字號</th>
+          <th>完整住址</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>第一類謄本</td>
+          <td>地主本人 / 代理人</td>
+          <td>✓ 完整</td>
+          <td>✓ 完整</td>
+          <td>✓ 完整</td>
+        </tr>
+        <tr>
+          <td><strong>第二類謄本</strong></td>
+          <td><strong>任何人（目標）</strong></td>
+          <td>✓ 完整</td>
+          <td>部分遮蔽</td>
+          <td><strong>✓ 完整</strong></td>
+        </tr>
+        <tr>
+          <td>第三類謄本</td>
+          <td>利害關係人</td>
+          <td>✓ 完整</td>
+          <td>部分遮蔽</td>
+          <td>✓ 完整</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>調查關鍵在於第二類謄本的「<strong>完整住址</strong>」——若地主住址與議員服務處或老家相同，即可確認關聯。</p>
+
+  <h3>各查詢方式費用與情報量</h3>
+  <div class="cost-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>查詢項目</th>
+          <th>費用</th>
+          <th>可取得資訊</th>
+          <th>調查價值</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>國土測繪雲</td>
+          <td>免費</td>
+          <td>土地權屬類別（國有 / 私有比例）</td>
+          <td>過濾用</td>
+        </tr>
+        <tr>
+          <td>異動索引</td>
+          <td>10 元 / 筆</td>
+          <td>姓氏（如陳＊＊）、交易時間</td>
+          <td>篩選 + 時間追蹤</td>
+        </tr>
+        <tr>
+          <td>權利人列表</td>
+          <td>10 元 / 筆</td>
+          <td>姓氏、所有權人序號</td>
+          <td>初步過濾</td>
+        </tr>
+        <tr>
+          <td>第二類電子謄本</td>
+          <td><strong>20 元 / 每頁</strong></td>
+          <td>姓名、完整住址、部分身分證</td>
+          <td>最高（直接對人）</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── 三、兩大調查路線對比 ── -->
+  <h2>三、兩大調查路線對比</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>策略</th>
+        <th>地毯式搜索（Tony / Ronny）</th>
+        <th>標靶式狙擊（林邑宣）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>核心邏輯</td>
+        <td>由地找人：全區 4,639 筆逐一清查</td>
+        <td>由人 / 事找地：鎖定已知名人與交易熱點</td>
+      </tr>
+      <tr>
+        <td>起始資料</td>
+        <td>地籍資料庫（地號清單）</td>
+        <td>實價登錄、財產申報</td>
+      </tr>
+      <tr>
+        <td>優點</td>
+        <td>不留死角。能抓出申報表外的神祕人頭與隱形地主</td>
+        <td>極速省錢。利用免費公開資料，精準打擊已知可疑對象</td>
+      </tr>
+      <tr>
+        <td>缺點</td>
+        <td>規費高、資料量大；需自動化程式與 OCR 配合</td>
+        <td>存在盲點：遠親、助理、陌生人頭購地無法發現</td>
+      </tr>
+      <tr>
+        <td>適用時機</td>
+        <td>欲揭發「系統性分贓」或「家族集體卡位」</td>
+        <td>預算極度有限，或快速針對特定大咖出稿</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <blockquote style="border-left:3px solid #ccc;background:#f8f8f8;padding:10px 14px;margin:0 0 28px;">
+    <strong>為什麼只看財產申報不夠？</strong><br>
+    申報範圍僅限本人、配偶、未成年子女。成年子女、父母、兄弟姊妹、助理名下的土地完全不在申報範圍，但只要地址相同，二類謄本就能揭露。
+  </blockquote>
+
+  <!-- ── 四、地毯式搜索優化五部曲 ── -->
+  <h2>四、地毯式搜索優化五部曲</h2>
+  <p>目標：將預算從 20 萬壓縮到 10 萬以內，同時維持「不漏人頭」的廣度。</p>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">排除公有地（免費）</div>
+        <p>利用「國土測繪雲」免費查詢土地權屬類別。凱旋一、二段已確認 609 筆國有地，可直接剔除。</p>
+        <span class="step-effect">效果：省下 609 筆 × 20 元 ≈ 1.2 萬元規費</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">階梯式收費：先查 10 元姓氏</div>
+        <p>申請「異動索引」或「權利人列表」（每筆 10 元），只取得所有權人姓氏。若姓氏與目標政治人物清單完全不符，直接放棄，不再支出 20 元謄本費。</p>
+        <span class="step-effect">效果：大量與目標無關的土地只花 10 元而非 20 元</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">技術突破：繞過 OCR 的圖片檔名漏洞</div>
+        <p>Ronny 發現地籍系統雖將住址轉為圖片，但圖片檔名本身包含住址編碼規律。透過程式自動解析檔名即可還原文字，無需 OCR，節省轉錄時間與錯誤率。</p>
+        <span class="step-effect">效果：省去昂貴的 OCR 流程，並降低轉錄錯誤率</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">家族代表抽樣法</div>
+        <p>同一地號若有多位地主（通常為同一家族，如 0006 地號有 10 位楊姓地主），不全數申請謄本，只取 1~2 位代表人的詳細資料。地址確認後即可推論整個家族關聯。</p>
+        <span class="step-effect">效果：按「頁」計費的風險大幅降低，避免單筆 60~80 元情況</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">半爬蟲自動化背景作業</div>
+        <p>撰寫背景程式，在人工點擊申請的同時，自動執行下載、更名、清理與建檔。對系統而言行為與人工無異（規避停權風險），同時實現自動化整理。</p>
+        <span class="step-effect">效果：節省大量後處理人力，解決數位化斷層問題</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 五、林邑宣的標靶路線：實價登錄的作用 ── -->
+  <h2>五、標靶路線：實價登錄的作用</h2>
+
+  <p>林邑宣從實價登錄發現了一個關鍵異常，可大幅縮小調查範圍：</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>年份</th>
+        <th>合計交易筆數</th>
+        <th>交易金額（概估）</th>
+        <th>備註</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>2016–2018</td>
+        <td>≈ 0</td>
+        <td>—</td>
+        <td>冷清期，幾乎無交易</td>
+      </tr>
+      <tr>
+        <td>2019–2020</td>
+        <td>10 → 27 筆</td>
+        <td>少量</td>
+        <td>開始起漲</td>
+      </tr>
+      <tr>
+        <td>2021</td>
+        <td>97 筆</td>
+        <td>約 13.5 億</td>
+        <td>爆發起點</td>
+      </tr>
+      <tr>
+        <td>2022</td>
+        <td><strong>123 筆</strong></td>
+        <td><strong>約 36 億</strong></td>
+        <td>高峰期，核心目標年份</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>2021–2022 年的交易爆發與某一時間點（高鐵站址確認或消息走漏）高度相關。林的策略是：<strong>只針對這兩年的買家查謄本</strong>，即可用最低成本鎖定最可疑的「精準卡位者」。</p>
+
+  <!-- ── 六、兩種策略的互補關係 ── -->
+  <h2>六、兩種策略的互補關係</h2>
+
+  <p>兩種策略並非互斥，可依預算分配組合：</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>階段</th>
+        <th>動作</th>
+        <th>方法來源</th>
+        <th>目的</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>第一波</td>
+        <td>從實價登錄鎖定 2021–2022 年交易地號</td>
+        <td>林邑宣（標靶）</td>
+        <td>快速出稿、鎖定大咖</td>
+      </tr>
+      <tr>
+        <td>第二波</td>
+        <td>地毯式掃全區姓氏，過濾非目標地號</td>
+        <td>Ronny（地毯）</td>
+        <td>抓出隱形人頭</td>
+      </tr>
+      <tr>
+        <td>深挖</td>
+        <td>對可疑地號申請第二類謄本取完整地址</td>
+        <td>共同</td>
+        <td>交叉比對確認身分</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ── 七、會議待決策三大問題 ── -->
+  <h2>七、會議待決策三大問題</h2>
+
+  <div class="decisions">
+
+    <div class="decision">
+      <div class="q">Q1：遺漏容忍度</div>
+      <div class="hint">我們是否願意為了省錢，接受標靶式狙擊可能漏掉隱藏人頭的風險？預算底線在哪裡？</div>
+    </div>
+
+    <div class="decision">
+      <div class="q">Q2：政治人物清單深度</div>
+      <div class="hint">清單要納入哪些層級？（本人 / 配偶 / 未成年子女 / 成年子女 / 父母 / 兄弟姊妹）清單愈廣，第二層姓氏過濾的效能愈高，也愈不容易遺漏。</div>
+    </div>
+
+    <div class="decision">
+      <div class="q">Q3：模式永續性</div>
+      <div class="hint">這套「優化地毯式搜索」流程，是否要制定為未來分析重大公共建設的標準 SOP？若是，本次成本就是基礎建設投資，而非單一案件支出。</div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">整理日期：2026-04-16 ／ 根據 Tony、Ronny、林邑宣三方對話記錄重新梳理</div>
+
+</div>
+</body>
+</html>
