@@ -32,8 +32,10 @@ BASE        = Path(__file__).parent
 CSV_DIR     = BASE / '即時更新'
 DASH        = BASE / '81Y3-dashboard'
 
-ACTS         = ['主日', '小排', '晨興', '禱告']
-ACT_WEIGHT   = {'主日': 3, '小排': 1, '晨興': 1, '禱告': 1}
+ACTS         = ['主日', '小排', '晨興', '禱告', '出訪', '受訪']
+ACT_WEIGHT   = {'主日': 3, '小排': 1, '晨興': 1, '禱告': 1, '出訪': 1, '受訪': 1}
+# 召會生活指標：主日以外的「參與型」活動（weekly.html 的 extra 區塊 + churchLifeCount 用）
+CHURCH_LIFE_ACTS = ['小排', '晨興', '禱告', '出訪', '受訪']
 
 # 各小區固定基數
 BASE_SIZE = {
@@ -446,7 +448,7 @@ def build_leaderboard(dk, members, active_weeks, n_board=4):
 
     return {
         'period':    period,
-        'max_score': n_board * 6,
+        'max_score': n_board * sum(ACT_WEIGHT.values()),
         'rankings':  rankings,
     }
 
@@ -499,11 +501,11 @@ def build_weekly(members, active_weeks):
             row_counts[pai] += 1
         rows = [{'name': k, 'count': v} for k, v in sorted(row_counts.items())]
 
-        # 小排/晨興/禱告 本週人數
+        # 召會生活（小排/晨興/禱告/出訪/受訪）本週人數
         extra = {
             act: sum(1 for m in adult_m.values()
                      if m.get(act, {}).get(latest_lbl, 0) == 1)
-            for act in ['小排', '晨興', '禱告']
+            for act in CHURCH_LIFE_ACTS
         }
 
         districts.append({
@@ -524,22 +526,17 @@ def build_weekly(members, active_weeks):
         member_list = []
         for name, m in adult_m.items():
             sunday_window = get_window(m, '主日', recent6)
-            if not any(v == 1 for v in get_window(m, '主日', recent6) +
-                       get_window(m, '小排', recent6) +
-                       get_window(m, '晨興', recent6) +
-                       get_window(m, '禱告', recent6)):
+            combined = []
+            for act in ACTS:
+                combined += get_window(m, act, recent6)
+            if not any(v == 1 for v in combined):
                 continue
             hist_pct = round(historical_rate(sunday_window) * 100)
             member_list.append({
                 'n':    name,
                 'pai':  m.get('pai', ''),
                 'hist': hist_pct,
-                'a': {
-                    '主日': m.get('主日', {}).get(latest_lbl, 0),
-                    '小排': m.get('小排', {}).get(latest_lbl, 0),
-                    '晨興': m.get('晨興', {}).get(latest_lbl, 0),
-                    '禱告': m.get('禱告', {}).get(latest_lbl, 0),
-                },
+                'a': {act: m.get(act, {}).get(latest_lbl, 0) for act in ACTS},
             })
         all_members[dk] = member_list
 
@@ -1301,12 +1298,15 @@ def update_cowork_page(members, active_weeks):
         else:
             return f'<span class="cp na">{act} –</span>'
 
+    # 配搭「完整」只看核心 4 項（主日/小排/晨興/禱告）；出訪/受訪顯示但不計入判定
+    CORE_ACTS = ['主日', '小排', '晨興', '禱告']
+
     def member_card(name):
         data = by_name.get(name)
         if data is None:
             return f'<div class="cm no-data"><div class="cm-name">⚠️ {name}</div><div class="cm-note">資料缺失</div></div>'
-        missing = [a for a in ACTS if data[a] != 1]
-        cls = 'all-ok' if not missing else ('has-miss' if missing else '')
+        missing = [a for a in CORE_ACTS if data[a] != 1]
+        cls = 'all-ok' if not missing else 'has-miss'
         pips = ''.join(pip(a, data[a]) for a in ACTS)
         warn = f'<div class="cm-warn">補填：{"、".join(missing)}</div>' if missing else ''
         return f'<div class="cm {cls}"><div class="cm-name">{name}</div><div class="cm-pips">{pips}</div>{warn}</div>'
@@ -1315,9 +1315,9 @@ def update_cowork_page(members, active_weeks):
         title = DK_TITLE[dk]
         names = COWORKERS_MAP.get(dk, [])
         total = len(names)
-        ok = sum(1 for n in names if all(by_name.get(n, {}).get(a, -1) == 1 for a in ACTS))
+        ok = sum(1 for n in names if all(by_name.get(n, {}).get(a, -1) == 1 for a in CORE_ACTS))
         status_cls = 'all-ok-badge' if ok == total else 'partial-badge'
-        status_txt = '✅ 全員完整' if ok == total else f'⚠️ {total - ok} 人待補'
+        status_txt = '✅ 全員核心完整' if ok == total else f'⚠️ {total - ok} 人核心待補'
         cards = ''.join(member_card(n) for n in names)
         return f'''
     <div class="dk-block">
@@ -1436,7 +1436,7 @@ header {{
   <a href="index.html" class="back-btn" title="返回首頁">‹</a>
   <div class="header-info">
     <div class="header-title">⭐ 配搭出席總覽</div>
-    <div class="header-sub">最新週次：{latest_lbl} · 主日 / 小排 / 晨興 / 禱告</div>
+    <div class="header-sub">最新週次：{latest_lbl} · 核心：主日 / 小排 / 晨興 / 禱告 &nbsp;·&nbsp; 參考：出訪 / 受訪</div>
   </div>
 </header>
 <div class="main">
@@ -1451,9 +1451,9 @@ header {{
     ok_all = sum(
         1 for dk, names in COWORKERS_MAP.items()
         for n in names
-        if all(by_name.get(n, {}).get(a, -1) == 1 for a in ACTS)
+        if all(by_name.get(n, {}).get(a, -1) == 1 for a in CORE_ACTS)
     )
-    print(f'  ✓ cowork.html ({latest_lbl}，{ok_all}/{total_cw} 人完整)')
+    print(f'  ✓ cowork.html ({latest_lbl}，{ok_all}/{total_cw} 人核心完整)')
 
 
 if __name__ == '__main__':
