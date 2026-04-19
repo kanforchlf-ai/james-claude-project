@@ -703,9 +703,10 @@ def build_member_data(members, active_weeks, roster, n_recent=12):
             })
         entries.sort(key=lambda e: e['n'])
         member_data[dk] = entries
-        base_data[dk]   = len(entries)
+        # BASE_DATA 維持寫死的 BASE_SIZE（官方登記人數），不跟著 MEMBER_DATA 變動
+        base_data[dk] = BASE_SIZE[dk]
 
-    # 群組/大區總和
+    # 群組/大區總和（維持原本寫死的數字：youth=69 hs=49 ms=105 church=223）
     for grp, sub_dks in GROUP_DKS.items():
         base_data[grp] = sum(base_data[d] for d in sub_dks)
     base_data['church'] = sum(base_data[d] for d in ['y1','y2','y3','hs1','hs2','hs3','ms1','ms2'])
