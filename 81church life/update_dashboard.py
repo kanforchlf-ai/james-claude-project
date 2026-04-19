@@ -650,26 +650,84 @@ def extract_trend_data(html):
     return week_meta, trend_data, member_data
 
 
+def load_roster():
+    """讀 81名單.csv 回傳 {name: {gender, state, group_zh}}"""
+    roster = {}
+    path = BASE / '歷史資料' / '81名單.csv'
+    if not path.exists():
+        return roster
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        for row in csv.reader(f):
+            if len(row) < 11 or row[0].strip() == '姓名':
+                continue
+            name = row[0].strip()
+            if not name:
+                continue
+            roster[name] = {
+                'gender': row[1].strip(),
+                'state':  row[7].strip(),
+                'group':  row[10].strip(),
+            }
+    return roster
+
+
+def build_member_data(members, active_weeks, roster, n_recent=12):
+    """依規則重建 MEMBER_DATA / BASE_DATA。
+    納入條件：
+      - 在 81名單.csv 中 狀態=正常
+      - 群組非兒童（學齡前/小學）
+      - 近 N 週（預設 12 週）內至少一項活動出席過 1 次
+    """
+    recent_labels = [lbl for _, lbl in active_weeks[-n_recent:]]
+
+    member_data = {}
+    base_data   = {}
+    for dk in ['y1','y2','y3','hs1','hs2','hs3','ms1','ms2']:
+        entries = []
+        for name, m in members[dk].items():
+            r = roster.get(name)
+            if not r or r['state'] != '正常' or r['group'] in KIDS_GROUPS:
+                continue
+            has_recent = any(
+                m.get(act, {}).get(lbl, 0) == 1
+                for act in ACTS for lbl in recent_labels
+            )
+            if not has_recent:
+                continue
+            a_code = GROUP_TO_A.get(r['group'], 'q')
+            entries.append({
+                'n': name,
+                'g': 'm' if r['gender'] == '男' else 'f',
+                'a': a_code,
+                'r': r['group'],
+            })
+        entries.sort(key=lambda e: e['n'])
+        member_data[dk] = entries
+        base_data[dk]   = len(entries)
+
+    # 群組/大區總和
+    for grp, sub_dks in GROUP_DKS.items():
+        base_data[grp] = sum(base_data[d] for d in sub_dks)
+    base_data['church'] = sum(base_data[d] for d in ['y1','y2','y3','hs1','hs2','hs3','ms1','ms2'])
+
+    return member_data, base_data
+
+
 def update_trend(members, active_weeks, html):
     """更新 trend.html 的 WEEK_META、TREND_DATA、MEMBER_DATA、BASE_DATA。"""
 
-    week_meta, trend_data, member_data = extract_trend_data(html)
+    week_meta, trend_data, _old_md = extract_trend_data(html)
 
-    # MEMBER_DATA 是「正式成員」白名單 — CSV 裡不在這份名單的（福音朋友/來訪/停用）不計入統計
-    existing_gender = {}   # name → g
-    member_a = {}          # name → a
+    # 重建 MEMBER_DATA / BASE_DATA（使用 81名單.csv + 近 12 週活動紀錄）
+    roster = load_roster()
+    member_data, base_data = build_member_data(members, active_weeks, roster)
+
+    existing_gender = {}
+    member_a = {}
     for dk_list in member_data.values():
         for entry in dk_list:
-            existing_gender[entry['n']] = entry.get('g', 'm')
-            member_a[entry['n']] = entry.get('a', 'd')
-
-    # 用 CSV members 的 group 欄位覆寫 member_a，確保中學/青壯/小學等分類正確
-    for dk_members in members.values():
-        for name, m in dk_members.items():
-            if name in member_a:
-                a_code = GROUP_TO_A.get(m.get('group', ''))
-                if a_code:
-                    member_a[name] = a_code
+            existing_gender[entry['n']] = entry['g']
+            member_a[entry['n']]       = entry['a']
 
     def seg_match(name, seg):
         g = existing_gender.get(name)
@@ -782,9 +840,22 @@ def update_trend(members, active_weeks, html):
         html, flags=re.DOTALL
     )
 
-    # [暫時停用] 重建 MEMBER_DATA / BASE_DATA
-    # 原因：CSV 含福音朋友/來訪/停用等非正式成員，需先釐清正確的過濾邏輯
-    # 待修復過濾規則後再啟用。
+    # 重建 MEMBER_DATA / BASE_DATA 寫回 HTML
+    # BASE_DATA 用非標準 JS 格式（key 不加引號）維持原樣
+    base_parts = [f'{k}:{v}' for k, v in base_data.items()]
+    new_base_js = '{\n  ' + ', '.join(base_parts) + ',\n}'
+    html = re.sub(
+        r'(const BASE_DATA\s*=\s*)(\{.*?\})(\s*;)',
+        lambda m: m.group(1) + new_base_js + m.group(3),
+        html, flags=re.DOTALL
+    )
+    html = re.sub(
+        r'(const MEMBER_DATA\s*=\s*)(\{.*?\})(\s*;)',
+        lambda m: m.group(1) + json.dumps(member_data, ensure_ascii=False) + m.group(3),
+        html, flags=re.DOTALL
+    )
+    total = sum(len(v) for v in member_data.values())
+    print(f'  + 重建 MEMBER_DATA：{total} 人（8 區）')
 
     return html
 
