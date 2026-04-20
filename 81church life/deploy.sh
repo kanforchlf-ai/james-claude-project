@@ -9,7 +9,7 @@ TMP_LOG=$(mktemp)
 python -X utf8 update_dashboard.py | tee "$TMP_LOG"
 
 # 從輸出抓最新週次（例如「4月第三週」）
-WEEK=$(grep -oE '最新資料週次：[0-9]+月第.週' "$TMP_LOG" | head -1 | sed 's/最新資料週次：//')
+WEEK=$(grep -oE '最新資料週次：[^ ]+' "$TMP_LOG" | head -1 | sed 's/最新資料週次：//')
 rm -f "$TMP_LOG"
 [ -z "$WEEK" ] && WEEK="$(date +%Y-%m-%d)"
 MSG="更新 $WEEK 出席資料"
