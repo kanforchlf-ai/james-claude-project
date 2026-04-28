@@ -381,6 +381,26 @@ body {
   border: 1px solid rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.65);
 }
+.chip-warn {
+  background: rgba(243,156,18,0.18);
+  border: 1px solid rgba(243,156,18,0.45);
+  color: #f5b041;
+  font-weight: 600;
+}
+.act-tab.tab-filter {
+  border-color: rgba(243,156,18,0.4);
+  color: rgba(245,176,65,0.75);
+}
+.act-tab.tab-filter.active {
+  background: rgba(243,156,18,0.2);
+  border-color: rgba(243,156,18,0.6);
+  color: #f5b041;
+}
+.empty-note {
+  font-size: 12px;
+  color: rgba(255,255,255,0.35);
+  padding: 4px 2px;
+}
 
 /* March comparison */
 .march-compare {
@@ -499,6 +519,8 @@ function renderDistrict(d) {
       <span class="act-tab" onclick="switchTab('${d.id}','禱告',this)">禱告</span>
       <span class="act-tab" onclick="switchTab('${d.id}','出訪',this)">出訪</span>
       <span class="act-tab" onclick="switchTab('${d.id}','受訪',this)">受訪</span>
+      <span class="act-tab tab-filter" onclick="switchTab('${d.id}','僅有生活',this)">僅有生活</span>
+      <span class="act-tab tab-filter" onclick="switchTab('${d.id}','僅有主日',this)">僅有主日</span>
     </div>
     <div class="chip-legend">
       <span class="legend-item"><span class="legend-dot dot-normal"></span>本週有出席</span>
@@ -547,10 +569,37 @@ function renderDistrict(d) {
   </div>`;
 }
 
+function attendedSunday(m) {
+  return m.a ? !!m.a['主日'] : !m.zero;
+}
+function attendedChurchLife(m) {
+  if (!m.a) return false;
+  return !!(m.a['小排'] || m.a['晨興'] || m.a['禱告'] || m.a['出訪'] || m.a['受訪']);
+}
+
 function renderChips(id, act) {
   const members = MEMBERS[id] || [];
   const wrap = document.getElementById('chips-' + id);
   if (!wrap) return;
+
+  if (act === '僅有生活' || act === '僅有主日') {
+    const filtered = members.filter(m => {
+      const s = attendedSunday(m);
+      const cl = attendedChurchLife(m);
+      return act === '僅有生活' ? (!s && cl) : (s && !cl);
+    });
+    if (filtered.length === 0) {
+      const msg = act === '僅有生活' ? '本週無「有召會生活但缺主日」的成員' : '本週無「有主日但缺召會生活」的成員';
+      wrap.innerHTML = '<span class="empty-note">✓ ' + msg + '</span>';
+      return;
+    }
+    wrap.innerHTML = filtered.map(m => {
+      const paiLabel = m.pai ? '<span class="chip-pai">' + m.pai + '</span>' : '';
+      return '<span class="member-chip chip-warn">' + m.n + ' ' + paiLabel + '</span>';
+    }).join('');
+    return;
+  }
+
   wrap.innerHTML = members.map(m => {
     const paiLabel = m.pai ? '<span class="chip-pai">' + m.pai + '</span>' : '';
     const attended = m.a ? m.a[act] : (act === '主日' ? (m.zero ? 0 : 1) : 0);
