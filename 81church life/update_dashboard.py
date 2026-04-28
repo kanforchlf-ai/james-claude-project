@@ -650,6 +650,90 @@ def extract_trend_data(html):
     return week_meta, trend_data, member_data
 
 
+def auto_append_new_members(csvs):
+    """
+    掃描 6 個活動 CSV，找出不在 81名單.csv 的人，自動補登。
+    僅納入 SUBZONE_MAP 內的 8 個小區、且非兒童群組（學齡前/小學）。
+    身分欄/性別欄/婚姻欄留空，預設狀態=正常。寫入前先備份。
+    回傳: 已新增的 [(name, 小區), ...] (按 8 個小區順序)。
+    """
+    import shutil
+    roster_path = BASE / '歷史資料' / '81名單.csv'
+    backup_path = BASE / '歷史資料' / '81名單.bak.csv'
+
+    # 1. 載入既有名單
+    existing = set()
+    if roster_path.exists():
+        with open(roster_path, encoding='utf-8-sig', newline='') as f:
+            for row in csv.reader(f):
+                if len(row) < 1:
+                    continue
+                name = row[0].strip()
+                if not name or name == '姓名':
+                    continue
+                existing.add(name)
+
+    # 2. 掃描 6 個 CSV，依 ACTS 順序（主日先，first-write-wins）收集新成員資訊
+    new_info = {}  # name -> {大區, 小區, 排, 群組, 受浸日期}
+    for act in ACTS:
+        rows = csvs.get(act, [])
+        for row in rows[2:]:
+            if len(row) < 8:
+                continue
+            subzone = row[COL_SUB].strip()
+            if subzone not in SUBZONE_MAP:
+                continue
+            name = row[COL_NAME].strip()
+            if not name or name in existing or name in new_info:
+                continue
+            group = row[COL_GROUP].strip()
+            if group in KIDS_GROUPS:
+                continue
+            baptism = row[7].strip() if len(row) > 7 else ''
+            if baptism == '0000-00-00':
+                baptism = ''
+            new_info[name] = {
+                '大區': row[COL_ZONE].strip(),
+                '小區': subzone,
+                '排':   row[COL_PAI].strip(),
+                '群組': group,
+                '受浸日期': baptism,
+            }
+
+    if not new_info:
+        return []
+
+    # 3. 備份
+    if roster_path.exists():
+        shutil.copy(roster_path, backup_path)
+
+    # 4. 追加（utf-8 而非 utf-8-sig，避免在檔案中段重複寫 BOM）
+    added = []
+    with open(roster_path, 'a', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        # 依 8 個小區固定順序輸出，便於閱讀
+        order = list(SUBZONE_MAP.keys())
+        sorted_names = sorted(new_info.keys(),
+                              key=lambda n: (order.index(new_info[n]['小區']), n))
+        for name in sorted_names:
+            info = new_info[name]
+            writer.writerow([
+                name,
+                '',                  # 性別
+                info['大區'],
+                info['小區'],
+                info['排'],
+                '',                  # 出生日期
+                info['受浸日期'],
+                '正常',              # 狀態
+                '',                  # 身分（留空，使用者手填）
+                '',                  # 婚姻狀況
+                info['群組'],
+            ])
+            added.append((name, info['小區']))
+    return added
+
+
 def load_roster():
     """讀 81名單.csv 回傳 {name: {gender, state, group_zh}}"""
     roster = {}
@@ -990,6 +1074,19 @@ def main():
             sys.exit(1)
         csvs[act] = read_csv(p)
         print(f'  ✓ {p.name} ({len(csvs[act])-2} 行)')
+
+    # ── 自動補登未登錄的新成員到 81名單.csv ─────────────────
+    new_added = auto_append_new_members(csvs)
+    if new_added:
+        from collections import defaultdict as _dd
+        by_zone = _dd(list)
+        for name, sz in new_added:
+            by_zone[sz].append(name)
+        print(f'\n🆕 自動補登 {len(new_added)} 位新成員到 81名單.csv（請檢查身分/性別欄）：')
+        for sz in SUBZONE_MAP.keys():
+            if sz in by_zone:
+                print(f'   {sz}: {"、".join(by_zone[sz])}')
+        print(f'   備份：歷史資料/81名單.bak.csv')
 
     # ── 解析資料 ────────────────────────────────────────────
     print('\n🔍 解析週次與成員...')
