@@ -189,7 +189,7 @@ def _read_xls(path):
     """用 Excel COM 讀取 .xls"""
     import win32com.client, pythoncom
     pythoncom.CoInitialize()
-    xl = win32com.client.Dispatch('Excel.Application')
+    xl = win32com.client.DispatchEx('Excel.Application')
     try:
         xl.Visible = False
     except Exception:
