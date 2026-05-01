@@ -2,3 +2,12 @@ political-donation/incomes.csv
 
 # 81 Church Life：81Y3-dashboard 是獨立 repo (kanforchlf-ai/81Y3-dashboard)，不雙寫
 81church life/81Y3-dashboard/
+
+# 81 Church Life：每週新資料 + 歷史名單只在本機，不上 git
+81church life/即時更新/
+81church life/歷史資料/
+81church life/snapshot.json
+
+# Python 編譯快取
+__pycache__/
+*.pyc
