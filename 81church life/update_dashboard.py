@@ -1470,15 +1470,15 @@ def update_cowork_page(members, active_weeks):
     # 配搭「完整」只看核心 4 項（主日/小排/晨興/禱告）；出訪/受訪顯示但不計入判定
     CORE_ACTS = ['主日', '小排', '晨興', '禱告']
 
-    def member_card(name):
+    def member_card(name, zone):
         data = by_name.get(name)
         if data is None:
-            return f'<div class="cm no-data"><div class="cm-name">⚠️ {name}</div><div class="cm-note">資料缺失</div></div>'
+            return f'<div class="cm no-data" data-name="{name}" data-zone="{zone}"><div class="cm-name">⚠️ {name}</div><div class="cm-note">資料缺失</div></div>'
         missing = [a for a in CORE_ACTS if data[a] != 1]
         cls = 'all-ok' if not missing else 'has-miss'
         pips = ''.join(pip(a, data[a]) for a in ACTS)
         warn = f'<div class="cm-warn">補填：{"、".join(missing)}</div>' if missing else ''
-        return f'<div class="cm {cls}"><div class="cm-name">{name}</div><div class="cm-pips">{pips}</div>{warn}</div>'
+        return f'<div class="cm {cls}" data-name="{name}" data-zone="{zone}"><div class="cm-name">{name}</div><div class="cm-pips">{pips}</div>{warn}</div>'
 
     def dk_block(dk):
         title = DK_TITLE[dk]
@@ -1487,7 +1487,7 @@ def update_cowork_page(members, active_weeks):
         ok = sum(1 for n in names if all(by_name.get(n, {}).get(a, -1) == 1 for a in CORE_ACTS))
         status_cls = 'all-ok-badge' if ok == total else 'partial-badge'
         status_txt = '✅ 全員核心完整' if ok == total else f'⚠️ {total - ok} 人核心待補'
-        cards = ''.join(member_card(n) for n in names)
+        cards = ''.join(member_card(n, dk) for n in names)
         return f'''
     <div class="dk-block">
       <div class="dk-header">
@@ -1509,6 +1509,9 @@ def update_cowork_page(members, active_weeks):
     </div>
     <div class="grp-dks">{dk_blocks}</div>
   </section>'''
+
+    coworkers_json = json.dumps(COWORKERS_MAP, ensure_ascii=False)
+    latest_lbl_json = json.dumps(latest_lbl, ensure_ascii=False)
 
     html = f'''<!DOCTYPE html>
 <html lang="zh-TW">
@@ -1599,6 +1602,7 @@ header {{
   .dk-block {{ min-width: unset; }}
 }}
 </style>
+<link rel="stylesheet" href="cowork-checkin.css">
 </head>
 <body>
 <header>
@@ -1608,9 +1612,17 @@ header {{
     <div class="header-sub">最新週次：{latest_lbl} · 核心：主日 / 小排 / 晨興 / 禱告 &nbsp;·&nbsp; 參考：出訪 / 受訪</div>
   </div>
 </header>
+<div id="checkin-bar"></div>
+<div id="leaderboard"></div>
 <div class="main">
 {group_sections}
 </div>
+<script>
+window.COWORK_CURRENT_WEEK = {latest_lbl_json};
+window.COWORK_MEMBERS = {coworkers_json};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="cowork-checkin.js"></script>
 </body>
 </html>'''
 
