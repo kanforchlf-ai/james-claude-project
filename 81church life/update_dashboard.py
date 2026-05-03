@@ -6,11 +6,15 @@
 用法：
   python update_dashboard.py
 
-每週把新的 CSV 放到「即時更新」資料夾後執行此腳本，
+每週把新的 .xls（或 .xlsx / .csv）放到「即時更新」資料夾後執行此腳本，
 自動更新所有 HTML 檔案（共 19 個）。
 
-CSV 命名規則（資料夾：即時更新/）：
-  主日最新.csv  小排最新.csv  晨興最新.csv  禱告最新.csv
+資料檔命名規則（資料夾：即時更新/）：
+  主日最新.xls / 小排最新.xls / 晨興最新.xls / 禱告最新.xls / 出訪最新.xls / 受訪最新.xls
+  腳本會先把 .xls / .xlsx 轉成同名 .csv（UTF-8 BOM），再從 CSV 讀資料。
+  若只放 .csv 也可以，會直接讀。
+
+依賴：python-calamine（讀 .xls/.xlsx，純 Rust，不需要安裝 Excel）
 ------------------------------------------------------------
 """
 
@@ -18,11 +22,6 @@ import csv, json, re, sys
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timedelta
-try:
-    import openpyxl
-    HAS_OPENPYXL = True
-except ImportError:
-    HAS_OPENPYXL = False
 
 # ============================================================
 # 設定
@@ -168,80 +167,38 @@ def week_date_range(month_str, label_str):
 # 讀取 CSV
 # ============================================================
 
-def read_csv(path):
-    """讀取 CSV 或 Excel（.xlsx/.xls），統一回傳 list[list[str]]"""
-    path = Path(path).resolve()
-    if path.suffix.lower() in ('.xlsx', '.xls'):
-        return _read_excel_via_com(path)
+def read_csv_file(path):
+    """讀取 CSV 檔（UTF-8 BOM），回傳 list[list[str]]。"""
     with open(path, encoding='utf-8-sig') as f:
         return list(csv.reader(f))
 
 
-def _read_excel_via_com(path):
-    """讀取 .xls/.xlsx，轉成 list[list[str]]"""
-    suffix = Path(path).suffix.lower()
-    if suffix == '.xls':
-        return _read_xls(path)
-    return _read_xlsx(path)
+def convert_xls_to_csv(xls_path):
+    """把 .xls / .xlsx 轉成同檔名的 .csv（UTF-8 BOM），回傳 csv 路徑。
 
+    用 python-calamine 讀，比 xlrd / openpyxl / Excel COM 更穩，
+    也能處理教會內部系統匯出的非標準 BIFF .xls。
+    """
+    from python_calamine import CalamineWorkbook
+    xls_path = Path(xls_path)
+    csv_path = xls_path.with_suffix('.csv')
+    wb = CalamineWorkbook.from_path(str(xls_path))
+    rows = wb.get_sheet_by_index(0).to_python()
 
-def _read_xls(path):
-    """用 Excel COM 讀取 .xls"""
-    import win32com.client, pythoncom
-    pythoncom.CoInitialize()
-    xl = win32com.client.DispatchEx('Excel.Application')
-    try:
-        xl.Visible = False
-    except Exception:
-        pass
-    try:
-        xl.DisplayAlerts = False
-    except Exception:
-        pass
-    try:
-        wb = xl.Workbooks.Open(str(path))
-        ws = wb.ActiveSheet
-        used = ws.UsedRange
-        rows = []
-        for r in range(1, used.Rows.Count + 1):
-            row = []
-            for c in range(1, used.Columns.Count + 1):
-                v = used.Cells(r, c).Value
-                if v is None:
-                    row.append('')
-                elif isinstance(v, float) and v == int(v):
-                    row.append(str(int(v)))
-                else:
-                    row.append(str(v).strip())
-            rows.append(row)
-        wb.Close(False)
-        return rows
-    finally:
-        try:
-            xl.Quit()
-        except Exception:
-            pass
-        pythoncom.CoUninitialize()
+    def cell_to_str(v):
+        if v is None:
+            return ''
+        if isinstance(v, float) and v.is_integer():
+            return str(int(v))
+        return str(v).strip()
 
+    out = [[cell_to_str(c) for c in r] for r in rows]
+    while out and all(c == '' for c in out[-1]):
+        out.pop()
 
-def _read_xlsx(path):
-    """用 openpyxl 讀取 .xlsx"""
-    import openpyxl
-    wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
-    ws = wb.active
-    rows = []
-    for row in ws.iter_rows(values_only=True):
-        r = []
-        for v in row:
-            if v is None:
-                r.append('')
-            elif isinstance(v, float) and v == int(v):
-                r.append(str(int(v)))
-            else:
-                r.append(str(v).strip())
-        rows.append(r)
-    wb.close()
-    return rows
+    with open(csv_path, 'w', encoding='utf-8-sig', newline='') as f:
+        csv.writer(f).writerows(out)
+    return csv_path
 
 
 def get_week_meta(rows):
@@ -1058,22 +1015,24 @@ def main():
     print('81Y3 Dashboard 週更新')
     print('=' * 50)
 
-    # ── 讀取 CSV / Excel ─────────────────────────────────────
+    # ── 先把 .xls/.xlsx 轉成 .csv，再從 CSV 吃資料 ─────────────
     print('\n📂 讀取資料檔...')
     csvs = {}
     for act in ACTS:
-        # 優先找 Excel，找不到才找 CSV
-        p = None
-        for ext in ('.xlsx', '.xls', '.csv'):
-            candidate = CSV_DIR / f'{act}最新{ext}'
-            if candidate.exists():
-                p = candidate
+        # 1. 若有新版 .xlsx / .xls，先轉成 .csv（覆蓋舊 csv）
+        for ext in ('.xlsx', '.xls'):
+            src = CSV_DIR / f'{act}最新{ext}'
+            if src.exists():
+                dst = convert_xls_to_csv(src)
+                print(f'  🔄 {src.name} → {dst.name}')
                 break
-        if p is None:
+        # 2. 從 CSV 讀
+        csv_path = CSV_DIR / f'{act}最新.csv'
+        if not csv_path.exists():
             print(f'  ✗ 找不到 {act}最新(.xlsx/.xls/.csv)，請放到「即時更新」資料夾')
             sys.exit(1)
-        csvs[act] = read_csv(p)
-        print(f'  ✓ {p.name} ({len(csvs[act])-2} 行)')
+        csvs[act] = read_csv_file(csv_path)
+        print(f'  ✓ {csv_path.name} ({len(csvs[act])-2} 行)')
 
     # ── 自動補登未登錄的新成員到 81名單.csv ─────────────────
     new_added = auto_append_new_members(csvs)

@@ -85,7 +85,7 @@ python sync_from_gsheet.py
 
 `deploy.sh` 自動執行：
 
-1. **跑 `update_dashboard.py`**：讀 6 個 xls → 重建 20 個 HTML。出現在出席資料但不在名單的人會自動補登到 `81名單.csv`（身分/性別留空），原檔備份為 `81名單.bak.csv`。輸出 `🆕 自動補登 X 位` 是預期行為。
+1. **跑 `update_dashboard.py`**：先把 6 個 `*最新.xls` 轉成同名 `.csv`（用 `python-calamine`，UTF-8 BOM），再從 CSV 讀資料 → 重建 20 個 HTML。出現在出席資料但不在名單的人會自動補登到 `81名單.csv`（身分/性別留空），原檔備份為 `81名單.bak.csv`。輸出 `🆕 自動補登 X 位` 是預期行為。
 2. **推部署 repo**：`cd 81Y3-dashboard && git push` → `kanforchlf-ai/81Y3-dashboard`（GitHub Pages 1-2 分鐘後更新網站）
 3. **推備份 repo**：外層 push → `jameskan-TW/james-claude-project`
 
