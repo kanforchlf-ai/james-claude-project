@@ -45,8 +45,8 @@
 │   ├── ms1, ms2/              # 國中兩區
 │   ├── kids/                  # 兒童專區（12 歲以下）
 │   ├── theme.css
-│   ├── cowork-checkin.js      # 配搭打卡互動（連 Supabase）
-│   ├── cowork-checkin.css     # 配搭打卡樣式
+│   ├── cowork-checkin.js      # 配搭點名互動（連 Supabase）
+│   ├── cowork-checkin.css     # 配搭點名樣式
 │   ├── bot_server.py          # LINE Bot 伺服器
 │   ├── dashboard_rag.py       # RAG（讀 dashboard 資料）
 │   ├── Dockerfile             # LINE Bot 容器化
@@ -99,7 +99,7 @@ python sync_from_gsheet.py
 | ---------- | -------------------------------------------------------------- | -------------------------- |
 | 全會所     | `index.html`                                                   | 首頁總覽                   |
 | 全會所     | `weekly.html`                                                  | 本週點名（全員出席狀態）   |
-| 全會所     | `cowork.html`                                                  | 配搭出席總覽 + **每週打卡競賽**（每週日 11:30 開賽）   |
+| 全會所     | `cowork.html`                                                  | 配搭出席總覽 + **每週點名競賽**（每週日 11:30 開賽）   |
 | 全會所     | `trend.html`                                                   | 多週出席趨勢               |
 | 全會所     | `invite.html`                                                  | 全會所挽回 + 不規律名單    |
 | 全會所     | `leaderboard.html` / `progress.html` / `guide.html` / `kids/`  | 排行榜 / 月度進度 / 說明 / 兒童 |
@@ -133,9 +133,9 @@ python sync_from_gsheet.py
 
 ---
 
-## 配搭打卡競賽系統
+## 配搭點名競賽系統
 
-`cowork.html` 除了顯示配搭出席外，還整合了**每週打卡競賽**（69 位配搭比賽誰最快點完名）：
+`cowork.html` 除了顯示配搭出席外，還整合了**每週點名競賽**（69 位配搭比賽誰最快點完名）：
 
 | 設定項 | 值 |
 | --- | --- |
@@ -143,26 +143,26 @@ python sync_from_gsheet.py
 | 開放對象 | 8 區共 69 位配搭（依 `update_dashboard.py` 的 `COWORKERS_MAP`）|
 | 後端 | Supabase project `hiytxefiylgsjehzxglw`，表 `cowork_checkins` |
 | 排行榜 Tier | 🏆 1-3 / 🌟 頂標 4-10 / ⭐ 前標 11-25 / ✦ 中標 26-40 / 後段 41+ |
-| 撤回 | 競賽中可撤回自己的打卡（限同一場次）|
+| 撤回 | 競賽中可撤回自己的點名（限同一場次）|
 | 預設摺疊 | 26 名以後預設摺疊（按「⏬ 顯示其餘 X 人」展開）|
 
 **架構**：
 
 ```
 cowork.html  (update_dashboard.py 自動生成 + 注入點)
-  ├─ #checkin-bar           ← cowork-checkin.js 動態渲染打卡列
+  ├─ #checkin-bar           ← cowork-checkin.js 動態渲染點名列
   ├─ #leaderboard           ← cowork-checkin.js 動態渲染 Tier 排行榜
-  ├─ .cm[data-name][data-zone]  ← 各配搭卡片，JS 補打卡狀態
+  ├─ .cm[data-name][data-zone]  ← 各配搭卡片，JS 補點名狀態
   └─ <script src="cowork-checkin.js">
        └─ Supabase JS client → cowork_checkins 表
 ```
 
 **狀態切換**（每秒檢查時間）：
 
-- 🟢 競賽中：可打卡 + 確認框 + 撤回鈕 + 倒數結束
+- 🟢 競賽中：可點名 + 確認框 + 撤回鈕 + 倒數結束
 - 🔴 休息期：禁止操作 + 顯示上週最終排行榜 + 倒數下次開始
 
-詳細的開發/調整方式（Tier 名次切點、競賽時間…）見 [`開發指南.md`](開發指南.md) 的「配搭打卡 / Supabase 後端」段落。
+詳細的開發/調整方式（Tier 名次切點、競賽時間…）見 [`開發指南.md`](開發指南.md) 的「配搭點名 / Supabase 後端」段落。
 
 ---
 
