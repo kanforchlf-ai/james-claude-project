@@ -1169,37 +1169,9 @@ def main():
         write_html(path, html)
         print(f'    {dk}: {len(lb["rankings"])} 人，期間：{lb["period"]}')
 
-    # ── 本週點名（weekly.html）──────────────────────────────
+    # ── 本週點名 + 所有歷史週（weekly.html + weekly-wNN.html）──
     print('\n📋 更新本週點名...')
-    districts, all_members, meta = build_weekly(members, active_weeks)
-    path = DASH / 'weekly.html'
-    html = read_html(path)
-
-    # JS 資料
-    html = patch_const(html, 'DISTRICTS', json.dumps(districts, ensure_ascii=False))
-    html = patch_const(html, 'MEMBERS',   json.dumps(all_members, ensure_ascii=False))
-
-    # topbar-date（右上角小日期）
-    html = re.sub(
-        r'(<div class="topbar-date">)[^<]*(</div>)',
-        rf'\g<1>{meta["short_range"]}\g<2>',
-        html
-    )
-
-    # 日期 sub-header：<div class="sub">...</div>（h1 下方）
-    html = re.sub(
-        r'(<h1>[^<]*本週點名[^<]*</h1>\s*<div class="sub">)[^<]*(</div>)',
-        rf'\g<1>{meta["date_range"]}（{meta["week_num"]}）\g<2>',
-        html
-    )
-
-    # Summary cards（依序：本週總計、基數、出席率、未提交區）
-    def replace_stat_val(html, old_val, new_val):
-        return html.replace(
-            f'<div class="val">{old_val}</div>',
-            f'<div class="val">{new_val}</div>',
-            1
-        )
+    template_html = read_html(DASH / 'weekly.html')
 
     # 用 regex 替換四個 stat card 的值（按順序）
     def patch_stat_cards(html, total, base, pct, zero):
@@ -1216,24 +1188,122 @@ def main():
             return m.group(1) + new_v + m.group(3) + label + m.group(5)
         return re.sub(pattern, repl, html)
 
-    html = patch_stat_cards(
-        html,
-        meta['total_all'], meta['base_all'],
-        meta['pct_all'],   meta['zero_dks']
-    )
+    def patch_nav(html, direction, href, label, disabled=False):
+        """patch prev / next 導覽按鈕"""
+        cls = f'week-nav {direction}' + (' disabled' if disabled else '')
+        new_a = f'<a href="{href}" class="{cls}">{label}</a>'
+        pattern = rf'<a [^>]*class="week-nav {direction}[^"]*"[^>]*>[^<]*</a>'
+        return re.sub(pattern, new_a, html)
 
-    # Footer note
-    html = re.sub(
-        r'(本週資料為)[^\。。]+?(統計。)',
-        rf'\g<1>{meta["short_range"]}\g<2>',
-        html
-    )
+    def filename_for(meta, is_current):
+        """current → weekly.html；其他 → weekly-wNN.html（取自 meta['week_num'] 的數字）"""
+        if is_current:
+            return 'weekly.html'
+        wm = re.search(r'(\d+)', meta.get('week_num', '') or '')
+        return f'weekly-w{wm.group(1)}.html' if wm else None
 
-    write_html(path, html)
+    # 先為每個 active week 算好資料和檔名
+    weeks_data = []
+    for i in range(len(active_weeks)):
+        d, am, m = build_weekly(members, active_weeks[:i+1])
+        is_cur = (i == len(active_weeks) - 1)
+        fn = filename_for(m, is_cur)
+        if not fn:
+            continue   # 沒週數就跳過
+        weeks_data.append({
+            'idx': i, 'is_current': is_cur, 'filename': fn,
+            'districts': d, 'all_members': am, 'meta': m,
+        })
+
+    def render_week(wi):
+        html = template_html
+        meta = wi['meta']
+        is_current = wi['is_current']
+        title_zh = '本週點名追蹤' if is_current else '上週點名追蹤'
+
+        # JS 資料
+        html = patch_const(html, 'DISTRICTS', json.dumps(wi['districts'], ensure_ascii=False))
+        html = patch_const(html, 'MEMBERS',   json.dumps(wi['all_members'], ensure_ascii=False))
+
+        # topbar-date（右上日期）
+        html = re.sub(
+            r'(<div class="topbar-date">)[^<]*(</div>)',
+            rf'\g<1>{meta["short_range"]}\g<2>',
+            html
+        )
+
+        # sub-header（依賴 template 的 "本週點名" 為錨點，先改 sub 再改 h1）
+        html = re.sub(
+            r'(<h1>[^<]*本週點名[^<]*</h1>\s*<div class="sub">)[^<]*(</div>)',
+            rf'\g<1>{meta["date_range"]}（{meta["week_num"]}）\g<2>',
+            html
+        )
+
+        # prev 按鈕（往過去）
+        idx = wi['idx']
+        if idx > 0:
+            prev_wi = next((w for w in weeks_data if w['idx'] == idx - 1), None)
+            if prev_wi:
+                html = patch_nav(html, 'prev', prev_wi['filename'],
+                                 f'← {prev_wi["meta"]["short_range"]}')
+            else:
+                html = patch_nav(html, 'prev', '#', '← 最早一週', disabled=True)
+        else:
+            html = patch_nav(html, 'prev', '#', '← 最早一週', disabled=True)
+
+        # next 按鈕（往未來）
+        if not is_current:
+            next_wi = next((w for w in weeks_data if w['idx'] == idx + 1), None)
+            if next_wi:
+                html = patch_nav(html, 'next', next_wi['filename'],
+                                 f'{next_wi["meta"]["short_range"]} →')
+            else:
+                html = patch_nav(html, 'next', '#', '本週為最新', disabled=True)
+        else:
+            html = patch_nav(html, 'next', '#', '本週為最新', disabled=True)
+
+        # 非本週：改 h1 + topbar-title 為「上週點名追蹤」
+        if not is_current:
+            html = re.sub(
+                r'(<div class="topbar-title">)📋 本週點名追蹤(</div>)',
+                rf'\g<1>📋 {title_zh}\g<2>',
+                html
+            )
+            html = re.sub(
+                r'<h1>📋 本週點名追蹤</h1>',
+                f'<h1>📋 {title_zh}</h1>',
+                html
+            )
+
+        # Stat cards
+        html = patch_stat_cards(
+            html, meta['total_all'], meta['base_all'],
+            meta['pct_all'], meta['zero_dks']
+        )
+
+        # Footer note
+        html = re.sub(
+            r'(本週資料為)[^\。。]+?(統計。)',
+            rf'\g<1>{meta["short_range"]}\g<2>',
+            html
+        )
+        return html
+
+    # 寫所有檔案
+    for wi in weeks_data:
+        write_html(DASH / wi['filename'], render_week(wi))
+
+    # 印 log
+    current = weeks_data[-1]
+    meta = current['meta']
     print(f'    日期：{meta["date_range"]}（{meta["week_num"]}）')
     print(f'    總計：{meta["total_all"]}/{meta["base_all"]} ({meta["pct_all"]}%)')
-    for d in districts:
+    for d in current['districts']:
         print(f'    {d["id"]}: {d["total"]}/{d["base"]} ({d["pct"]}%) | 上月均 {d["march_avg"]}')
+    print(f'    📅 共寫 {len(weeks_data)} 個 weekly 檔案')
+    for wi in weeks_data[:-1]:
+        wm = wi["meta"]
+        print(f'       {wi["filename"]}: {wm["short_range"]} ({wm["pct_all"]}%)')
 
     # ── 兒童專區（kids/index.html）──────────────────────────
     print('\n🎈 更新兒童專區...')
@@ -1281,7 +1351,8 @@ def main():
 
     # ── 完成 ─────────────────────────────────────────────────
     print('\n' + '=' * 50)
-    print('✅ 全部更新完成！共 20 個 HTML 檔案')
+    n_weekly = len(weeks_data) if 'weeks_data' in dir() else 1
+    print(f'✅ 全部更新完成！共 {19 + n_weekly} 個 HTML 檔案（含 {n_weekly} 個 weekly 週次頁）')
     if active_weeks:
         print(f'   最新資料週次：{active_weeks[-1][1]}')
     print('=' * 50)

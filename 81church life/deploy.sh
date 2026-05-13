@@ -17,6 +17,10 @@ MSG="更新 $WEEK 出席資料"
 echo
 echo "=== 2/3 推部署 repo (kanforchlf-ai/81Y3-dashboard) → 網站 ==="
 pushd 81Y3-dashboard > /dev/null
+# 把新生成的歷史週檔案 add 進來（已追蹤的會被 -u 蓋掉，新檔由這行抓）
+for f in weekly-w*.html; do
+  [ -e "$f" ] && git add "$f"
+done
 if [ -n "$(git status --porcelain)" ]; then
   git add -u
   git commit -m "$MSG"
