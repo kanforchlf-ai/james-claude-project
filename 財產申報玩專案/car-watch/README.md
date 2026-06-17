@@ -29,21 +29,19 @@
 
 ```
 data-json-0429/
-├── export_cars.py      # 從原始 JSON 匯出 cars_data.json
-├── compute_stats.py    # 計算統計資料，輸出 stats.json
-└── build_index.py      # 將兩份 JSON inline 成最終 index.html
+├── export_cars.py      # 從原始申報 JSON 匯出 cars_data.json
+└── build_index.py      # 將 cars_data.json inline 成最終 index.html
+                        # （所有統計由前端即時計算，無需預算統計檔）
 
 car-watch/
-├── index.html          # 最終輸出，單檔 SPA（約 844 KB）
-├── cars_data.json      # 1,424 人的完整車輛資料
-└── stats.json          # 預計算統計（品牌榜、縣市率、超跑等）
+├── index.html          # 最終輸出，單檔 SPA
+└── cars_data.json      # 677 人的完整車輛資料
 ```
 
 更新資料時依序執行：
 
 ```bash
 python export_cars.py
-python compute_stats.py
 python build_index.py
 ```
 

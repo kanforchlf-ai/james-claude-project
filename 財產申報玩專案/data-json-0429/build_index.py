@@ -9,8 +9,6 @@ OUT   = os.path.join(BASE, 'index.html')
 
 with open(os.path.join(BASE, 'cars_data.json'), encoding='utf-8') as f:
     cars_raw = f.read()
-with open(os.path.join(BASE, 'stats.json'), encoding='utf-8') as f:
-    stats_raw = f.read()
 
 # ─── HTML ─────────────────────────────────────────────────────────────────────
 html = r'''<!DOCTYPE html>
@@ -688,7 +686,6 @@ footer{text-align:center;padding:2.5rem;color:#aaa;font-size:.8rem;border-top:1p
 <script>
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const CARS  = ''' + cars_raw  + ''';
-const STATS = ''' + stats_raw + ''';
 
 const PARTY_COLOR = {
   '國民黨':'#003f88','民進黨':'#1b9431','民眾黨':'#28c0c8',
