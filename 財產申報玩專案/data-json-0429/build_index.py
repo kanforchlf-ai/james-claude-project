@@ -1081,7 +1081,7 @@ function doSearch(){
       return `<div class="${cls}"><span class="ci-em">${em(car.brand)}</span><span class="ci-left"><span class="ci-brand">${car.brand}</span>${raw}</span><span class="ci-right">${dateEl}${priceEl}</span></div>`;
     }).join('');
     const dt = p.date?p.date.substring(0,7):'';
-    function fmtPrice(n){ return n>=10000000?(n/10000000).toFixed(2)+'億':(n/10000).toFixed(0)+'萬'; }
+    function fmtPrice(n){ return n>=100000000?(n/100000000).toFixed(2)+'億':Math.round(n/10000).toLocaleString()+'萬'; }
     const totalEl = p.total_price
       ? `<div class="s-total">
            <span class="s-total-label">已知總車價</span>
@@ -1234,7 +1234,7 @@ function renderGender(){
 // ─── 8 RICHEST ───────────────────────────────────────────────────────────────
 function renderRichest(){
   const RANK_CLASS = ['gold','silver','bronze'];
-  function fmt(n){ return n>=10000000 ? (n/10000000).toFixed(2)+'億' : (n/10000).toFixed(0)+'萬'; }
+  function fmt(n){ return n>=100000000 ? (n/100000000).toFixed(2)+'億' : Math.round(n/10000).toLocaleString()+'萬'; }
 
   const html = computeRichest(scopedPeople()).map((p,i)=>{
     const rankCls = RANK_CLASS[i] || '';
