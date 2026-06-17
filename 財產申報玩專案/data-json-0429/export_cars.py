@@ -405,6 +405,12 @@ for person_dir_name in os.listdir(DATA_DIR):
                 price_traced = True
                 price_traced_date = hist[1]
 
+        # 同一台車重複申報（如換車牌、車牌遺失重領）→ 只計一次，避免總額重複加總
+        _note = car.get('取得價額', '') or ''
+        if ('同一台車' in _note or '同一輛車' in _note) and any(
+                c['brand'] == brand and c['cc'] == cc and c['price'] == price for c in cars):
+            continue
+
         acquired = car.get('登記取得時間', '').strip()
         owner = car.get('所有人', '').strip()
 

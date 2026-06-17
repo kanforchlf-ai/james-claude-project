@@ -653,14 +653,12 @@ footer{text-align:center;padding:2.5rem;color:#aaa;font-size:.8rem;border-top:1p
   <div class="page-header">
     <div class="back" onclick="showView('landing')">← 回首頁</div>
     <h2>💰 最貴車庫排行榜</h2>
-    <p>以申報取得價格加總排行，包含本人及配偶名下車輛（僅計算有填價格的車）</p>
+    <p>以申報「取得價額」加總排行，包含本人及配偶名下車輛（僅計算有填價格的車）</p>
   </div>
   <div class="section-body">
     <div class="insight-box" style="margin-bottom:1.5rem">
-      ⚠️ <strong>資料限制說明</strong>：依法規定，取得超過五年的車輛不需申報價格，約 <strong>43%</strong> 的車填「超過五年」。
-      以下排行只計算有填入價格的車輛，實際總價可能更高。
-      部分標「超過五年」的車輛，系統已從該民代<strong>歷史申報記錄</strong>中回溯到原始購買價格（標有 ✱ 符號）。
-      每台車旁的 <strong>民國年月</strong> 為申報的登記取得時間，可看出這台車是新購還是舊車。
+      💡 <strong>金額計算基準</strong>：本頁金額為財產申報表的「<strong>取得價額</strong>」，也就是<strong>購入當時的價格，並非現值或市價</strong>。老車顯示的是當年原始購入價、不折舊；不同年份購入的車相加，等於「累計取得成本」，並不代表車隊現在的市場總值。<br>
+      ⚠️ <strong>資料限制</strong>：依法登記滿五年的車輛免申報價格（約 <strong>__NO_PRICE_PCT__%</strong> 的車標「超過五年」），這些車<strong>不計入總額</strong>，故總價僅供參考、實際規模可能更大。部分「超過五年」的車已從該民代<strong>歷史申報記錄</strong>回溯到原始購入價（標有 ✱）。每台車旁的<strong>民國年月</strong>為登記取得時間。
     </div>
     <div id="richest-list"></div>
   </div>
@@ -1464,6 +1462,8 @@ function triggerAnimations(id){
 _people = json.loads(cars_raw)
 _total_people = len(_people)
 _total_cars = sum(len(p.get('cars', [])) for p in _people)
+_no_price = sum(1 for p in _people for c in p.get('cars', []) if not isinstance(c.get('price'), (int, float)))
+_no_price_pct = round(_no_price / _total_cars * 100) if _total_cars else 0
 
 # 性別豪車率（與前端 computeGender 一致：以每台車的 luxury flag 計）
 def _gender_rate(sex):
@@ -1491,6 +1491,7 @@ _top_county, _top_rate = _county_rates[0] if _county_rates else ('', 0)
 html = (html
     .replace('__TOTAL_PEOPLE__', f'{_total_people:,}')
     .replace('__TOTAL_CARS__', f'{_total_cars:,}')
+    .replace('__NO_PRICE_PCT__', f'{_no_price_pct}')
     .replace('__FEMALE_RATE__', f'{_f_rate:g}')
     .replace('__MALE_RATE__', f'{_m_rate:g}')
     .replace('__GENDER_DIFF__', f'{_g_diff:g}')
