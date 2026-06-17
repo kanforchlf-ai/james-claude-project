@@ -825,7 +825,7 @@ function renderHeroStats(){
     {n: pp.length.toLocaleString(),                              l:'位民代'},
     {n: allCars.length.toLocaleString(),                         l:'台申報車輛'},
     {n: allCars.filter(c=>c.luxury).length.toLocaleString(),     l:'台豪車'},
-    {n: allCars.filter(c=>c.supercar).length.toLocaleString(),        l:'台超跑 🏎️'},
+    {n: pp.filter(p=>p.cars.some(c=>c.supercar||c.brand==='Porsche')).length.toLocaleString(), l:'位有超跑 🏎️'},
     {n: pp.reduce((s,p)=>s+p.spouse_count,0).toLocaleString(),        l:'台配偶名下 👫'},
   ].map(x=>`<div class="hero-stat"><span class="hero-stat-num">${x.n}</span><div class="hero-stat-label">${x.l}</div></div>`).join('');
 }
