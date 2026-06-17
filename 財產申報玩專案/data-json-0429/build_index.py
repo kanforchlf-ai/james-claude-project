@@ -485,7 +485,7 @@ footer{text-align:center;padding:2.5rem;color:#aaa;font-size:.8rem;border-top:1p
     <div class="feature-card" style="--fc:#8e44ad" onclick="showView('party')">
       <div class="icon">🎯</div>
       <h3>政黨停車場</h3>
-      <p>國民黨豪車率 24%、時代力量 8%，每個停車格都是一台申報的車。</p>
+      <p>國民黨豪車率 __KMT_RATE__%、民進黨 __DPP_RATE__%，每個停車格都是一台申報的車。</p>
       <div class="tag">進停車場 →</div>
     </div>
     <div class="feature-card" style="--fc:#d35400" onclick="showView('gender')">
@@ -503,7 +503,7 @@ footer{text-align:center;padding:2.5rem;color:#aaa;font-size:.8rem;border-top:1p
     <div class="feature-card" style="--fc:#16a085" onclick="showView('owner')">
       <div class="icon">👫</div>
       <h3>配偶名下</h3>
-      <p>申報車輛中 42% 登記在配偶名下。誰家的車幾乎都掛在另一半名下？</p>
+      <p>申報車輛中 __SPOUSE_PCT__% 登記在配偶名下。誰家的車幾乎都掛在另一半名下？</p>
       <div class="tag">看分析 →</div>
     </div>
   </div>
@@ -1488,6 +1488,19 @@ _county_rates = sorted(
     key=lambda x: -x[1])
 _top_county, _top_rate = _county_rates[0] if _county_rates else ('', 0)
 
+# 政黨豪車率（與前端 computeParties 一致：以每台車計）
+def _party_rate(party):
+    cs = [c for p in _people if p.get('party') == party for c in p.get('cars', [])]
+    if not cs:
+        return 0.0
+    return round(sum(1 for c in cs if c.get('luxury')) / len(cs) * 1000) / 10
+_kmt_rate = _party_rate('國民黨')
+_dpp_rate = _party_rate('民進黨')
+
+# 配偶名下比例
+_spouse = sum(p.get('spouse_count', 0) for p in _people)
+_spouse_pct = round(_spouse / _total_cars * 100) if _total_cars else 0
+
 html = (html
     .replace('__TOTAL_PEOPLE__', f'{_total_people:,}')
     .replace('__TOTAL_CARS__', f'{_total_cars:,}')
@@ -1496,7 +1509,10 @@ html = (html
     .replace('__MALE_RATE__', f'{_m_rate:g}')
     .replace('__GENDER_DIFF__', f'{_g_diff:g}')
     .replace('__TOP_COUNTY__', _top_county)
-    .replace('__TOP_COUNTY_RATE__', f'{_top_rate:g}'))
+    .replace('__TOP_COUNTY_RATE__', f'{_top_rate:g}')
+    .replace('__KMT_RATE__', f'{_kmt_rate:g}')
+    .replace('__DPP_RATE__', f'{_dpp_rate:g}')
+    .replace('__SPOUSE_PCT__', f'{_spouse_pct}'))
 
 with open(OUT, 'w', encoding='utf-8') as f:
     f.write(html)
