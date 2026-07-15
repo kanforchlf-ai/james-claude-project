@@ -125,16 +125,24 @@ DK_TO_SUBS = {
 WEEK_NUM_MAP = {'第一週': 'W1', '第二週': 'W2', '第三週': 'W3',
                 '第四週': 'W4', '第五週': 'W5'}
 
-# 週次標籤 → 主日日期（每週主日，格式 M/D）
+# 週次標籤 → 週結束日 Monday（每個月的第 N 個 Monday，格式 M/D）
 # 腳本依此計算 weekly.html 的日期範圍 header
-KNOWN_DATES = {
-    ('3月', 'W1'): '3/2',  ('3月', 'W2'): '3/9',  ('3月', 'W3'): '3/16',
-    ('3月', 'W4'): '3/23', ('3月', 'W5'): '3/30',
-    ('4月', 'W1'): '4/6',  ('4月', 'W2'): '4/13', ('4月', 'W3'): '4/20',
-    ('4月', 'W4'): '4/27',
-    ('5月', 'W1'): '5/4',  ('5月', 'W2'): '5/11', ('5月', 'W3'): '5/18',
-    ('5月', 'W4'): '5/25',
-}
+def _gen_known_dates(year=2026):
+    """自動產生整年的 (M月, WN) → 'M/D' 對應（每個月的第 N 個 Monday）"""
+    from datetime import date, timedelta
+    result = {}
+    # 找第一個 Monday
+    d = date(year, 1, 1)
+    d += timedelta(days=(7 - d.weekday()) % 7)
+    while d.year == year:
+        first = date(d.year, d.month, 1)
+        first_mon = first + timedelta(days=(7 - first.weekday()) % 7)
+        n = (d - first_mon).days // 7 + 1
+        result[(f'{d.month}月', f'W{n}')] = f'{d.month}/{d.day}'
+        d += timedelta(days=7)
+    return result
+
+KNOWN_DATES = _gen_known_dates(2026)
 
 def week_date_range(month_str, label_str):
     """
@@ -173,32 +181,164 @@ def read_csv_file(path):
         return list(csv.reader(f))
 
 
-def convert_xls_to_csv(xls_path):
-    """把 .xls / .xlsx 轉成同檔名的 .csv（UTF-8 BOM），回傳 csv 路徑。
+# 新版檔名對應：內部活動名 → 檔名中的字（家聚會出訪/家聚會受訪）
+NEW_FMT_ACT_NAMES = {
+    '主日': '主日', '小排': '小排', '晨興': '晨興', '禱告': '禱告',
+    '出訪': '家聚會出訪', '受訪': '家聚會受訪',
+}
+NEW_FMT_DIR = None   # 在 main() 依 CSV_DIR 動態設定
 
-    用 python-calamine 讀，比 xlrd / openpyxl / Excel COM 更穩，
-    也能處理教會內部系統匯出的非標準 BIFF .xls。
+
+def _iso_monday_to_csv_label(iso_str):
+    """新版 xlsx 週次欄的 ISO Monday → 舊版 'M月第N週' 標籤。
+
+    規則：這週的下個 Monday 是該月的第 N 個 Monday → 'M月第N週'
+    例：'2026-05-25' → 下 Mon=6/1 = 6月第 1 個 Mon → '6月第一週'
     """
-    from python_calamine import CalamineWorkbook
-    xls_path = Path(xls_path)
-    csv_path = xls_path.with_suffix('.csv')
-    wb = CalamineWorkbook.from_path(str(xls_path))
-    rows = wb.get_sheet_by_index(0).to_python()
+    from datetime import date, timedelta
+    y, m, d = map(int, iso_str.split('-'))
+    next_mon = date(y, m, d) + timedelta(days=7)
+    first = date(next_mon.year, next_mon.month, 1)
+    first_mon = first + timedelta(days=(7 - first.weekday()) % 7)
+    n = (next_mon - first_mon).days // 7 + 1
+    zh = ['第一週', '第二週', '第三週', '第四週', '第五週'][n - 1]
+    return f'{next_mon.month}月{zh}'
 
-    def cell_to_str(v):
+
+def _new_fmt_to_old_shape(rows):
+    """新版單 header xlsx rows → 舊版兩 header CSV shape（不改語意，供既有 parser 吃）。
+
+    新版 header：#, 姓名, 大區, 小區, 排, 群組, 出席, 出席率, 最近出席, 缺席週, YYYY-MM-DD, ...
+    舊版兩 rows：
+      row0：'' * 8 + 月份字（每月首欄）
+      row1：大區, 小區, 排, 姓名, 電話, 群組, Email, 受浸日期, 第一週, 第二週, ...
+    資料 row：大區, 小區, 排, 姓名, '', 群組, '', '', 0/1, 0/1, ...
+    """
+    if not rows:
+        return []
+    header = rows[0]
+
+    # 找出週次欄起點（第一個 YYYY-MM-DD）
+    week_start = None
+    for i, h in enumerate(header):
+        if isinstance(h, str) and re.match(r'\d{4}-\d{2}-\d{2}$', h):
+            week_start = i
+            break
+    if week_start is None:
+        return []
+
+    # 每個週次欄的舊標籤
+    week_labels = [_iso_monday_to_csv_label(header[i]) for i in range(week_start, len(header))]
+
+    # 舊版 row0：8 個空欄 + 每月第一週那格填「2026年M月」
+    old_r0 = [''] * 8
+    current_month = None
+    for lbl in week_labels:
+        month = lbl.split('月')[0] + '月'
+        if month != current_month:
+            old_r0.append(f'2026年{month}')
+            current_month = month
+        else:
+            old_r0.append('')
+
+    # 舊版 row1：欄位標題 + 週次
+    old_r1 = ['大區', '小區', '排', '姓名', '電話', '群組', 'Email', '受浸日期']
+    for lbl in week_labels:
+        old_r1.append(lbl.split('月')[1])   # '第一週'
+
+    def cell_str(v):
         if v is None:
             return ''
         if isinstance(v, float) and v.is_integer():
             return str(int(v))
         return str(v).strip()
 
-    out = [[cell_to_str(c) for c in r] for r in rows]
+    def week_val(v):
+        if v is None or v == '':
+            return ''
+        if isinstance(v, (int, float)):
+            return '1' if int(v) == 1 else '0'
+        s = str(v).strip()
+        return '1' if s in ('1', '1.0') else '0'
+
+    out = [old_r0, old_r1]
+    for r in rows[1:]:
+        if len(r) < 6:
+            continue
+        name = cell_str(r[1])
+        if not name:
+            continue
+        zone = cell_str(r[2])
+        sub  = cell_str(r[3])
+        pai  = cell_str(r[4])
+        grp  = cell_str(r[5])
+        old_row = [zone, sub, pai, name, '', grp, '', '']
+        for i in range(week_start, len(header)):
+            v = r[i] if i < len(r) else ''
+            old_row.append(week_val(v))
+        out.append(old_row)
+    return out
+
+
+def convert_xls_to_csv(xls_path, out_path=None):
+    """把 .xls / .xlsx 轉成 .csv（UTF-8 BOM），回傳 csv 路徑。
+
+    用 python-calamine 讀，比 xlrd / openpyxl / Excel COM 更穩，
+    也能處理教會內部系統匯出的非標準 BIFF .xls。
+
+    - 自動偵測新版單 header（row0 col1='姓名'）→ 重塑成舊版兩 header shape
+    - out_path 指定輸出路徑（預設同名 .csv）
+    """
+    from python_calamine import CalamineWorkbook
+    xls_path = Path(xls_path)
+    csv_path = Path(out_path) if out_path else xls_path.with_suffix('.csv')
+    wb = CalamineWorkbook.from_path(str(xls_path))
+    rows = wb.get_sheet_by_index(0).to_python()
+
+    # 偵測：新版 sheet 0 名叫「出席」；row0 的 col1 = '姓名'
+    is_new = (
+        len(rows) > 0 and len(rows[0]) > 1 and
+        isinstance(rows[0][1], str) and rows[0][1].strip() == '姓名'
+    )
+
+    if is_new:
+        out = _new_fmt_to_old_shape(rows)
+    else:
+        def cell_to_str(v):
+            if v is None:
+                return ''
+            if isinstance(v, float) and v.is_integer():
+                return str(int(v))
+            return str(v).strip()
+        out = [[cell_to_str(c) for c in r] for r in rows]
+
     while out and all(c == '' for c in out[-1]):
         out.pop()
 
     with open(csv_path, 'w', encoding='utf-8-sig', newline='') as f:
         csv.writer(f).writerows(out)
     return csv_path
+
+
+def find_source_file(act):
+    """找活動的資料檔。優先順序：
+    1. 即時更新/新版/點名報表_{new_name}_*.xlsx（依 mtime 取最新）
+    2. 即時更新/{act}最新.xlsx / .xls / .csv
+    """
+    new_dir = CSV_DIR / '新版'
+    if new_dir.exists():
+        new_name = NEW_FMT_ACT_NAMES.get(act, act)
+        matches = sorted(
+            new_dir.glob(f'點名報表_{new_name}_*.xlsx'),
+            key=lambda p: p.stat().st_mtime, reverse=True
+        )
+        if matches:
+            return matches[0]
+    for ext in ('.xlsx', '.xls', '.csv'):
+        p = CSV_DIR / f'{act}最新{ext}'
+        if p.exists():
+            return p
+    return None
 
 
 def get_week_meta(rows):
@@ -1019,18 +1159,20 @@ def main():
     print('\n📂 讀取資料檔...')
     csvs = {}
     for act in ACTS:
-        # 1. 若有新版 .xlsx / .xls，先轉成 .csv（覆蓋舊 csv）
-        for ext in ('.xlsx', '.xls'):
-            src = CSV_DIR / f'{act}最新{ext}'
-            if src.exists():
-                dst = convert_xls_to_csv(src)
-                print(f'  🔄 {src.name} → {dst.name}')
-                break
-        # 2. 從 CSV 讀
-        csv_path = CSV_DIR / f'{act}最新.csv'
-        if not csv_path.exists():
-            print(f'  ✗ 找不到 {act}最新(.xlsx/.xls/.csv)，請放到「即時更新」資料夾')
+        src = find_source_file(act)
+        if not src:
+            print(f'  ✗ 找不到 {act} 的資料檔（即時更新/{act}最新.* 或 新版/點名報表_..._*.xlsx）')
             sys.exit(1)
+
+        csv_path = CSV_DIR / f'{act}最新.csv'   # 統一輸出到 即時更新/{act}最新.csv
+        if src.suffix.lower() in ('.xlsx', '.xls'):
+            convert_xls_to_csv(src, out_path=csv_path)
+            print(f'  🔄 {src.name} → {csv_path.name}')
+        elif src != csv_path:
+            # 已是 csv 但路徑不同 → 複製
+            csv_path.write_bytes(src.read_bytes())
+            print(f'  📄 {src.name} → {csv_path.name}')
+
         csvs[act] = read_csv_file(csv_path)
         print(f'  ✓ {csv_path.name} ({len(csvs[act])-2} 行)')
 
