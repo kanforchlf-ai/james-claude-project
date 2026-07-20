@@ -36,12 +36,34 @@ ACT_WEIGHT   = {'主日': 3, '小排': 1, '晨興': 1, '禱告': 1, '出訪': 1,
 # 召會生活指標：主日以外的「參與型」活動（weekly.html 的 extra 區塊 + churchLifeCount 用）
 CHURCH_LIFE_ACTS = ['小排', '晨興', '禱告', '出訪', '受訪']
 
-# 各小區固定基數
-BASE_SIZE = {
-    'y1': 20, 'y2': 23, 'y3': 26,
-    'hs1': 18, 'hs2': 20, 'hs3': 11,
-    'ms1': 56, 'ms2': 49,
-}
+# 各小區固定基數（沿革制：名單大異動時新增一筆，歷史週用當時的基數）
+# key = 生效起始週 (月, 第N週)，含當週；依序取最後一個 <= 目標週的版本
+BASE_SIZE_ERAS = [
+    # 開站基數，合計 223
+    ((3, 1), {'y1': 20, 'y2': 23, 'y3': 26,
+              'hs1': 18, 'hs2': 20, 'hs3': 11,
+              'ms1': 56, 'ms2': 49}),
+    # 2026-07 升級潮：小六升國中 +32（ms1+14/ms2+18）、國中升高中 12（全出自 ms1）、
+    # 高中升青年 8（y1+4/y2+3/y3+1）、高中內部互調 hs2−2/hs3+2；合計 255
+    ((7, 1), {'y1': 24, 'y2': 26, 'y3': 27,
+              'hs1': 20, 'hs2': 21, 'hs3': 12,
+              'ms1': 58, 'ms2': 67}),
+]
+BASE_SIZE = BASE_SIZE_ERAS[-1][1]   # 最新基數（trend 等單一基數頁面用）
+
+_WEEK_N_ORD = {'第一週': 1, '第二週': 2, '第三週': 3, '第四週': 4, '第五週': 5}
+
+def base_size_for(csv_lbl):
+    """依週次標籤（'5月第二週'）回傳當時生效的基數 dict。"""
+    m = re.match(r'(\d+)月(第.週)', csv_lbl or '')
+    if not m:
+        return BASE_SIZE
+    key = (int(m.group(1)), _WEEK_N_ORD.get(m.group(2), 1))
+    chosen = BASE_SIZE_ERAS[0][1]
+    for start, sizes in BASE_SIZE_ERAS:
+        if key >= start:
+            chosen = sizes
+    return chosen
 
 SUBZONE_MAP = {
     '青年一區': 'y1', '青年二區': 'y2', '青年三區': 'y3',
@@ -571,11 +593,11 @@ def build_weekly(members, active_weeks):
         # 排除兒童（學齡前/小學）
         adult_m = {n: m for n, m in dk_m.items() if m.get('group', '') not in KIDS_GROUPS}
 
-        # 本週主日出席人數
+        # 本週主日出席人數（基數依該週所屬 era，歷史週不受後續調整影響）
         attendees = [n for n, m in adult_m.items()
                      if m.get('主日', {}).get(latest_lbl, 0) == 1]
         total = len(attendees)
-        base  = BASE_SIZE[dk]
+        base  = base_size_for(latest_lbl)[dk]
         pct   = round(total / base * 100, 1)
 
         # 上月平均（前幾週平均）
@@ -639,7 +661,7 @@ def build_weekly(members, active_weeks):
 
     # Header metadata（各區 total 已排除兒童）
     total_all  = sum(d['total'] for d in districts)
-    base_all   = sum(d['base']  for d in districts)   # 223，維持架構表基數
+    base_all   = sum(d['base']  for d in districts)   # 該週 era 的基數合計
     pct_all    = round(total_all / base_all * 100, 1) if base_all else 0
     zero_dks   = sum(1 for d in districts if d['total'] == 0)
 
@@ -887,7 +909,7 @@ def build_member_data(members, active_weeks, roster, n_recent=12):
         # BASE_DATA 維持寫死的 BASE_SIZE（官方登記人數），不跟著 MEMBER_DATA 變動
         base_data[dk] = BASE_SIZE[dk]
 
-    # 群組/大區總和（維持原本寫死的數字：youth=69 hs=49 ms=105 church=223）
+    # 群組/大區總和（由最新 BASE_SIZE 加總）
     for grp, sub_dks in GROUP_DKS.items():
         base_data[grp] = sum(base_data[d] for d in sub_dks)
     base_data['church'] = sum(base_data[d] for d in ['y1','y2','y3','hs1','hs2','hs3','ms1','ms2'])
