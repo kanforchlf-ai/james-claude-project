@@ -135,12 +135,12 @@ python sync_from_gsheet.py
 
 ## 配搭點名競賽系統
 
-`cowork.html` 除了顯示配搭出席外，還整合了**每週點名競賽**（69 位配搭比賽誰最快點完名）：
+`cowork.html` 除了顯示配搭出席外，還整合了**每週點名競賽**（68 位配搭比賽誰最快點完名）：
 
 | 設定項 | 值 |
 | --- | --- |
 | 競賽窗口 | 週日 11:30 ~ 週一 23:00（台灣時間，每週循環）|
-| 開放對象 | 8 區共 69 位配搭（依 `update_dashboard.py` 的 `COWORKERS_MAP`）|
+| 開放對象 | 8 區共 68 位配搭（依 `update_dashboard.py` 的 `COWORKERS_MAP`）|
 | 後端 | Supabase project `hiytxefiylgsjehzxglw`，表 `cowork_checkins` |
 | 排行榜 Tier | 🏆 1-3 / 🌟 頂標 4-10 / ⭐ 前標 11-25 / ✦ 中標 26-40 / 後段 41+ |
 | 撤回 | 競賽中可撤回自己的點名（限同一場次）|
