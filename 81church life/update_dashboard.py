@@ -1410,15 +1410,26 @@ def main():
 
         # prev 按鈕（往過去）
         idx = wi['idx']
-        if idx > 0:
-            prev_wi = next((w for w in weeks_data if w['idx'] == idx - 1), None)
-            if prev_wi:
-                html = patch_nav(html, 'prev', prev_wi['filename'],
-                                 f'← {prev_wi["meta"]["short_range"]}')
-            else:
-                html = patch_nav(html, 'prev', '#', '← 最早一週', disabled=True)
+        prev_wi = next((w for w in weeks_data if w['idx'] == idx - 1), None) if idx > 0 else None
+        if prev_wi:
+            html = patch_nav(html, 'prev', prev_wi['filename'],
+                             f'← {prev_wi["meta"]["short_range"]}')
         else:
-            html = patch_nav(html, 'prev', '#', '← 最早一週', disabled=True)
+            # active_weeks 最早一週：匯出視窗滾動後，磁碟可能還留有更早的
+            # weekly-wNN.html（歷史 URL 不刪）。有就連過去，導覽鏈不斷。
+            linked = False
+            wm_n = re.search(r'(\d+)', wi['meta'].get('week_num', '') or '')
+            if wm_n:
+                prev_n = int(wm_n.group(1)) - 1
+                if (DASH / f'weekly-w{prev_n}.html').exists():
+                    p_end = datetime.fromisocalendar(2026, prev_n, 1)
+                    p_start = p_end - timedelta(days=6)
+                    html = patch_nav(
+                        html, 'prev', f'weekly-w{prev_n}.html',
+                        f'← {p_start.month}/{p_start.day}～{p_end.month}/{p_end.day}')
+                    linked = True
+            if not linked:
+                html = patch_nav(html, 'prev', '#', '← 最早一週', disabled=True)
 
         # next 按鈕（往未來）
         if not is_current:
