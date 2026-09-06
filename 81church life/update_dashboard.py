@@ -56,6 +56,12 @@ BASE_SIZE_ERAS = [
 ]
 BASE_SIZE = BASE_SIZE_ERAS[-1][1]   # 最新基數（trend 等單一基數頁面用）
 
+# 月人數目標（大區層級）：設定的月份會在 weekly.html 頂部顯示目標達成率列；
+# 未設定的月份（含歷史週）自動不顯示。要換月目標就加一筆。
+MONTH_TARGETS = {
+    '9月': {'youth': 70, 'hs': 55, 'ms': 110},   # 合計 235
+}
+
 _WEEK_N_ORD = {'第一週': 1, '第二週': 2, '第三週': 3, '第四週': 4, '第五週': 5}
 
 def base_size_for(csv_lbl):
@@ -1406,6 +1412,36 @@ def main():
             r'(<h1>[^<]*本週點名[^<]*</h1>\s*<div class="sub">)[^<]*(</div>)',
             rf'\g<1>{meta["date_range"]}（{meta["week_num"]}）\g<2>',
             html
+        )
+
+        # 月目標達成率列（TARGET_BAR 標記間每次重生；該月無目標則清空）
+        def _target_bar():
+            month = meta.get('latest_lbl', '').split('月')[0] + '月'
+            tg = MONTH_TARGETS.get(month)
+            if not tg:
+                return ''
+            sums = {g: sum(d['total'] for d in wi['districts']
+                           if DK_GROUP[d['id']] == g)
+                    for g in ('youth', 'hs', 'ms')}
+            total, ttotal = sum(sums.values()), sum(tg.values())
+            disp = [('youth', '⚡ 青年'), ('hs', '🔥 高中'), ('ms', '🌱 國中')]
+            items = []
+            for g, gname in disp + [(None, '📍 全會所')]:
+                v, t = (sums[g], tg[g]) if g else (total, ttotal)
+                pct = round(v / t * 100) if t else 0
+                hit = ' hit' if pct >= 100 else ''
+                items.append(
+                    f'<div class="target-item{hit}"><span class="tname">{gname}</span>'
+                    f'<span class="tval">{v} / {t}</span>'
+                    f'<div class="tbar"><div class="tfill" style="width:{min(pct,100)}%"></div></div>'
+                    f'<span class="tpct">{pct}%</span></div>')
+            return (f'<div class="target-bar"><div class="target-head">🎯 {month}人數目標 {ttotal} 人</div>'
+                    f'<div class="target-items">{"".join(items)}</div></div>')
+
+        html = re.sub(
+            r'(<!-- TARGET_BAR_START -->).*?(<!-- TARGET_BAR_END -->)',
+            lambda m: m.group(1) + _target_bar() + m.group(2),
+            html, flags=re.DOTALL
         )
 
         # prev 按鈕（往過去）
