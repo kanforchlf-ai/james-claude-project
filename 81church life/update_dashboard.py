@@ -59,7 +59,8 @@ BASE_SIZE = BASE_SIZE_ERAS[-1][1]   # 最新基數（trend 等單一基數頁面
 # 月人數目標（大區層級）：設定的月份會在 weekly.html 頂部顯示目標達成率列；
 # 未設定的月份（含歷史週）自動不顯示。要換月目標就加一筆。
 MONTH_TARGETS = {
-    '9月': {'youth': 70, 'hs': 55, 'ms': 110},   # 合計 235
+    '9月':  {'youth': 70, 'hs': 55, 'ms': 110},   # 合計 235
+    '10月': {'youth': 70, 'hs': 55, 'ms': 110},   # 沿用 9 月目標
 }
 
 _WEEK_N_ORD = {'第一週': 1, '第二週': 2, '第三週': 3, '第四週': 4, '第五週': 5}
@@ -328,14 +329,17 @@ def convert_xls_to_csv(xls_path, out_path=None):
     wb = CalamineWorkbook.from_path(str(xls_path))
     rows = wb.get_sheet_by_index(0).to_python()
 
-    # 偵測：新版 sheet 0 名叫「出席」；row0 的 col1 = '姓名'
-    is_new = (
-        len(rows) > 0 and len(rows[0]) > 1 and
-        isinstance(rows[0][1], str) and rows[0][1].strip() == '姓名'
-    )
+    # 偵測新版：在前幾列中找 header 列（col1='姓名'）。
+    # 教會系統 2026-09 起會在最上面多加一列標題（日期範圍/篩選條件），
+    # header 不一定在 row 0，所以用「找」的而不是只看第一列。
+    hdr_idx = None
+    for i, r in enumerate(rows[:5]):
+        if len(r) > 1 and isinstance(r[1], str) and r[1].strip() == '姓名':
+            hdr_idx = i
+            break
 
-    if is_new:
-        out = _new_fmt_to_old_shape(rows)
+    if hdr_idx is not None:
+        out = _new_fmt_to_old_shape(rows[hdr_idx:])
     else:
         def cell_to_str(v):
             if v is None:
