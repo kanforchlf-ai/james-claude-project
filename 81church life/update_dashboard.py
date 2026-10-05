@@ -397,15 +397,21 @@ def get_week_meta(rows):
     return result
 
 
-def get_active_weeks(rows, week_meta):
-    """只回傳有至少一筆 '1' 的週次。"""
-    return [
-        (col, lbl) for col, lbl in week_meta
-        if any(
-            len(row) > col and row[col] == '1'
-            for row in rows[2:]
-        )
-    ]
+def get_active_weeks(rows, week_meta, min_last_week=5):
+    """回傳有資料的週次。
+
+    一般週次：至少 1 筆 '1' 就算有效。
+    最新一週：需累積 >= min_last_week 筆才算開始，
+    避免一兩個早點名的人讓「本週」提前翻頁。"""
+    counts = []
+    for col, lbl in week_meta:
+        c = sum(1 for row in rows[2:] if len(row) > col and row[col] == '1')
+        if c > 0:
+            counts.append((col, lbl, c))
+    # 尾端點名數太少的週先不視為有效（等累積夠了自然翻頁）
+    while len(counts) > 1 and counts[-1][2] < min_last_week:
+        counts.pop()
+    return [(col, lbl) for col, lbl, _ in counts]
 
 
 def csv_label_to_trend(csv_lbl):
